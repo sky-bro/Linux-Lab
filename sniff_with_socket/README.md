@@ -18,8 +18,10 @@
 
 ### 上层模块：
 
-- [ ] 数据包的统计模块
-- [x] 数据包协议统计模块
+- [ ] 数据包、协议统计模块
 - [ ] 网络网元发现模块（需要）
 - [ ] 数据包构造模块(选做)
 - [ ] 数据包过滤模块（需要）
+- [ ] 命令行参数解析
+
+[bind raw socket to specific interface](https://stackoverflow.com/questions/3998569/how-to-bind-raw-socket-to-specific-interface)

@@ -9,9 +9,9 @@
 #include <time.h>
 
 int total, tcp, udp; // 用int 在filter port时可以安全得减去过滤去的包
-unsigned int arp,icmp,igmp,other,iphdrlen;
+unsigned int ip, arp,icmp,igmp,other,other_ip;
 
-struct sockaddr_in source,dest;
+struct sockaddr_in source, dest;
 
 FILE* log_file;
 FILE* summary_file;
@@ -26,7 +26,9 @@ struct Filter {
 	int tcp; // print tcp packet
 	int udp; // print udp packet
 	int icmp; // print icmp packet
-	int port; // only this port
+	int other; // count in other packet
+	uint16_t port; // only this port
+	int dump; // dump packets
 } filter =  {
 	.arp = 1,
 	.ethernet = 0,
@@ -34,7 +36,9 @@ struct Filter {
 	.tcp = 0,
 	.udp = 0,
 	.icmp = 0,
-	.port = 0
+	.port = 0,
+	.dump = 0,
+	.other = 0
 };
 
 void log_summary() {
@@ -45,7 +49,15 @@ void log_summary() {
 	}
 	fprintf(summary_file, "\n\nSTART: %s", ctime(&start_time));
 
-	fprintf(summary_file, "hello\n");
+	fprintf(summary_file, "|-Total: %d\n", total);
+	fprintf(summary_file, "\t|-ARP: %d\n", arp);
+	fprintf(summary_file, "\t|-IP: %d\n", ip);
+	fprintf(summary_file, "\t\t|-ICMP: %d\n", icmp);
+	fprintf(summary_file, "\t\t|-IGMP: %d\n", igmp);
+	fprintf(summary_file, "\t\t|-TCP: %d\n", tcp);
+	fprintf(summary_file, "\t\t|-UDP: %d\n", udp);
+	fprintf(summary_file, "\t\t|-Other IP: %d\n", other_ip);
+	fprintf(summary_file, "\t|-Other: %d\n", other);
 
 	fprintf(summary_file, "END: %s", ctime(&end_time));
 
@@ -56,6 +68,8 @@ void log_summary() {
 
 void buf_dump(unsigned char *data, int Size)
 {
+	if (!filter.dump) return;
+	fprintf(log_file, "Dump\n");
     int i, j;
 	for (i = 0; i < Size; i++)
 	{
@@ -107,25 +121,23 @@ void print_ip_header(unsigned char* buffer,int buflen)
 {
 	if (!filter.ip) return;
 
-	struct iphdr *ip = (struct iphdr*)(buffer + sizeof(struct ethhdr));
-
-	iphdrlen =ip->ihl*4;
+	struct iphdr *iph = (struct iphdr*)(buffer + sizeof(struct ethhdr));
 
 	memset(&source, 0, sizeof(source));
-	source.sin_addr.s_addr = ip->saddr;     
+	source.sin_addr.s_addr = iph->saddr;
 	memset(&dest, 0, sizeof(dest));
-	dest.sin_addr.s_addr = ip->daddr;     
+	dest.sin_addr.s_addr = iph->daddr;     
 
 	fprintf(log_file , "\nIP Header\n");
 
-	fprintf(log_file , "\t|-Version              : %d\n",(unsigned int)ip->version);
-	fprintf(log_file , "\t|-Internet Header Length  : %d DWORDS or %d Bytes\n",(unsigned int)ip->ihl,((unsigned int)(ip->ihl))*4);
-	fprintf(log_file , "\t|-Type Of Service   : %d\n",(unsigned int)ip->tos);
-	fprintf(log_file , "\t|-Total Length      : %d  Bytes\n",ntohs(ip->tot_len));
-	fprintf(log_file , "\t|-Identification    : %d\n",ntohs(ip->id));
-	fprintf(log_file , "\t|-Time To Live	    : %d\n",(unsigned int)ip->ttl);
-	fprintf(log_file , "\t|-Protocol 	    : %d\n",(unsigned int)ip->protocol);
-	fprintf(log_file , "\t|-Header Checksum   : %d\n",ntohs(ip->check));
+	fprintf(log_file , "\t|-Version              : %d\n",(unsigned int)iph->version);
+	fprintf(log_file , "\t|-Internet Header Length  : %d DWORDS or %d Bytes\n",(unsigned int)iph->ihl,((unsigned int)(iph->ihl))*4);
+	fprintf(log_file , "\t|-Type Of Service   : %d\n",(unsigned int)iph->tos);
+	fprintf(log_file , "\t|-Total Length      : %d  Bytes\n",ntohs(iph->tot_len));
+	fprintf(log_file , "\t|-Identification    : %d\n",ntohs(iph->id));
+	fprintf(log_file , "\t|-Time To Live	    : %d\n",(unsigned int)iph->ttl);
+	fprintf(log_file , "\t|-Protocol 	    : %d\n",(unsigned int)iph->protocol);
+	fprintf(log_file , "\t|-Header Checksum   : %d\n",ntohs(iph->check));
 	fprintf(log_file , "\t|-Source IP         : %s\n", inet_ntoa(source.sin_addr));
 	fprintf(log_file , "\t|-Destination IP    : %s\n",inet_ntoa(dest.sin_addr));
 }
@@ -144,7 +156,6 @@ void print_arp_packet(unsigned char* buffer, int buflen)
    	fprintf(log_file , "\t|-Lengh of Protocol Address     : %u\n",arp->ar_pln);
    	fprintf(log_file , "\t|-Opcode      : %u\n",ntohs(arp->ar_op));
 
-    fprintf(log_file, "Dump\n");
 	buf_dump(buffer,buflen);
 
     fprintf(log_file,"*****************************************************************\n\n\n");
@@ -153,7 +164,7 @@ void print_arp_packet(unsigned char* buffer, int buflen)
 void print_icmp_packet(unsigned char *buffer, int buflen)
 {
 	unsigned short iphdrlen;
-	struct iphdr *iph = (struct iphdr *)buffer;
+	struct iphdr *iph = (struct iphdr*)(buffer + sizeof(struct ethhdr));
 	iphdrlen = iph->ihl * 4;
 	struct icmphdr *icmph = (struct icmphdr *)(buffer + iphdrlen);
 	fprintf(log_file,"\n*************************ICMP Packet******************************");
@@ -178,7 +189,6 @@ void print_icmp_packet(unsigned char *buffer, int buflen)
 	// fprintf(log_file, "Data Payload\n");
 	// PrintData(Buffer + iphdrlen + sizeof icmph, (Size - sizeof icmph - iph->ihl * 4));
     
-    fprintf(log_file, "Dump\n");
 	buf_dump(buffer,buflen);
 	
     fprintf(log_file,"*****************************************************************\n\n\n");
@@ -186,17 +196,18 @@ void print_icmp_packet(unsigned char *buffer, int buflen)
 
 void print_tcp_packet(unsigned char* buffer,int buflen)
 {
+	unsigned short iphdrlen;
+	struct iphdr *iph = (struct iphdr*)(buffer + sizeof(struct ethhdr));
+	iphdrlen = iph->ihl * 4;
 	struct tcphdr *tcph = (struct tcphdr*)(buffer + iphdrlen + sizeof(struct ethhdr));
-
-	if (ntohs(tcph->source) != filter.port && ntohs(tcph->dest) != filter.port) {
-		--total;
+	
+	if (filter.port != 0 && ntohs(tcph->source) != filter.port && ntohs(tcph->dest) != filter.port) {
 		--tcp;
 		return;
 	}
 	fprintf(log_file,"\n*************************TCP Packet******************************");
    	print_ethernet_header(buffer,buflen);
   	print_ip_header(buffer,buflen);
-
    	
    	fprintf(log_file , "\nTCP Header\n");
    	fprintf(log_file , "\t|-Source Port          : %u\n",ntohs(tcph->source));
@@ -215,7 +226,6 @@ void print_tcp_packet(unsigned char* buffer,int buflen)
 	fprintf(log_file , "\t|-Checksum             : %d\n",ntohs(tcph->check));
 	fprintf(log_file , "\t|-Urgent Pointer       : %d\n",tcph->urg_ptr);
 
-    fprintf(log_file, "Dump\n");
 	buf_dump(buffer,buflen);
 
     fprintf(log_file,"*****************************************************************\n\n\n");
@@ -223,9 +233,12 @@ void print_tcp_packet(unsigned char* buffer,int buflen)
 
 void print_udp_packet(unsigned char* buffer, int buflen)
 {
-	struct udphdr *udp = (struct udphdr*)(buffer + iphdrlen + sizeof(struct ethhdr));
-	if (ntohs(udp->source) != filter.port && ntohs(udp->dest) != filter.port) {
-		--total;
+	unsigned short iphdrlen;
+	struct iphdr *iph = (struct iphdr*)(buffer + sizeof(struct ethhdr));
+	iphdrlen = iph->ihl * 4;
+	struct udphdr *udph = (struct udphdr*)(buffer + iphdrlen + sizeof(struct ethhdr));
+	
+	if (filter.port != 0 && ntohs(udph->source) != filter.port && ntohs(udph->dest) != filter.port) {
 		--udp;
 		return;
 	}
@@ -235,12 +248,11 @@ void print_udp_packet(unsigned char* buffer, int buflen)
 	print_ip_header(buffer,buflen);
 	fprintf(log_file,"\nUDP Header\n");
 	
-	fprintf(log_file , "\t|-Source Port    	: %d\n" , ntohs(udp->source));
-	fprintf(log_file , "\t|-Destination Port	: %d\n" , ntohs(udp->dest));
-	fprintf(log_file , "\t|-UDP Length      	: %d\n" , ntohs(udp->len));
-	fprintf(log_file , "\t|-UDP Checksum   	: %d\n" , ntohs(udp->check));
+	fprintf(log_file , "\t|-Source Port    	: %d\n" , ntohs(udph->source));
+	fprintf(log_file , "\t|-Destination Port	: %d\n" , ntohs(udph->dest));
+	fprintf(log_file , "\t|-UDP Length      	: %d\n" , ntohs(udph->len));
+	fprintf(log_file , "\t|-UDP Checksum   	: %d\n" , ntohs(udph->check));
 
-    fprintf(log_file, "Dump\n");
 	buf_dump(buffer,buflen);
 
 	fprintf(log_file,"*****************************************************************\n\n\n");
@@ -249,47 +261,51 @@ void print_udp_packet(unsigned char* buffer, int buflen)
 void data_process(unsigned char* buffer,int buflen)
 {
     struct ethhdr *eth = (struct ethhdr *)(buffer);
-	struct iphdr *ip = (struct iphdr*)(buffer + sizeof (struct ethhdr));
-
+	struct iphdr *iph = (struct iphdr*)(buffer + sizeof (struct ethhdr));
     if (eth->h_proto == 0x0608) { // ARP
 		if (!filter.arp) return;
         ++arp;
+		++total;
         print_arp_packet(buffer, buflen);
     } else if (eth->h_proto == 0x0008) { // IP
-        switch (ip->protocol)
-        {
+		
+		switch (iph->protocol)
+		{
 
-            case 1: //ICMP Protocol
+			case 1: //ICMP Protocol
 				if (!filter.icmp) return;
-                ++icmp;
-                print_icmp_packet(buffer, buflen);
-                break;
+				++icmp;
+				print_icmp_packet(buffer, buflen);
+				break;
 
-            case 2: //IGMP Protocol
-		        ++igmp;
+			case 2: //IGMP Protocol
+				++igmp;
 
-            case 6: //TCP Protocol
+			case 6: //TCP Protocol
 				if (!filter.tcp) return;
-                ++tcp;
-                print_tcp_packet(buffer, buflen);
-                break;
+				++tcp;
+				print_tcp_packet(buffer, buflen);
+				break;
 
-            case 17: //UDP Protocol
+			case 17: //UDP Protocol
 				if (!filter.udp) return;
-                ++udp;
-                print_udp_packet(buffer, buflen);
-                break;
+				++udp;
+				print_udp_packet(buffer, buflen);
+				break;
 
-            default:
-                ++other;
-                break;
-
-        }
+			default:
+				++other_ip;
+				break;
+		}
+		++ip;
+		++total;
     } else {
-        ++other;
+		if (filter.other){
+			++total;
+			++other;
+		}
     }
 
-	++total;    
-    printf("ARP: %d TCP: %d UDP: %d ICMP: %d IGMP: %d Others: %d Total: %d\r", arp, tcp, udp, icmp, igmp, other, total);
+    printf("ARP: %d IP: %d TCP: %d UDP: %d ICMP: %d IGMP: %d Others: %d Other_IPs: %d Total: %d\r", arp, ip, tcp, udp, icmp, igmp, other, other_ip, total);
     fflush(stdout);
 }
