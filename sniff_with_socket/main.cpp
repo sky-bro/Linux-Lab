@@ -54,18 +54,7 @@ int main(int argc, char **argv)
 	
 	argp_parse (&argp, argc, argv, 0, 0, &args);
 
-	if (args.interface) {
-		struct ifreq ifr;
-		memset(&ifr, 0, sizeof(ifr));
-		snprintf(ifr.ifr_name, IFNAMSIZ, args.interface);
-		if (setsockopt(sock_r, SOL_SOCKET, SO_BINDTODEVICE, (void *)&ifr, sizeof(ifr)) < 0)
-		{
-			// perror("Server-setsockopt() error for SO_BINDTODEVICE");
-			// printf("%s\n", strerror(errno));
-			close(sock_r);
-			exit(-1);
-		}
-	}
+
 
 	filter.dump = args.dump;
 	filter.port = args.port;
@@ -99,6 +88,19 @@ int main(int argc, char **argv)
 	{
 		printf("error in socket, you may need to use sudo\n");
 		return -1;
+	}
+
+	if (args.interface) {
+		struct ifreq ifr;
+		memset(&ifr, 0, sizeof(ifr));
+		snprintf(ifr.ifr_name, IFNAMSIZ, args.interface);
+		if (setsockopt(sock_r, SOL_SOCKET, SO_BINDTODEVICE, (void *)&ifr, sizeof(ifr)) < 0)
+		{
+			perror("Server-setsockopt() error for SO_BINDTODEVICE");
+			printf("%s\n", strerror(errno));
+			close(sock_r);
+			exit(-1);
+		}
 	}
 	
 	log_file=fopen("log.txt","a");
