@@ -46,27 +46,27 @@ parse_opt (int key, char *arg, struct argp_state *state)
 {
   /* Get the input argument from argp_parse, which we
      know is a pointer to our arguments structure. */
-  struct arguments *arguments = state->input;
+  struct arguments *args = (struct arguments *)state->input;
 
   switch (key)
   {
   case 'a':
-    arguments->all = 1;
+    args->all = 1;
     break;
   case 'd':
-    arguments->dump = 1;
+    args->dump = 1;
     break;
   case 'e':
-    arguments->ethernet = 1;
+    args->ethernet = 1;
     break;
   case 'i':
-    arguments->interface = arg;
+    args->interface = arg;
     break;
   case 'p':
-    arguments->port = (unsigned short)(atoi(arg));
+    args->port = (unsigned short)(atoi(arg));
     break;
   case ARGP_KEY_ARGS:
-    arguments->protocols = state->argv + state->next;
+    args->protocols = state->argv + state->next;
     state->next = state->argc;
     break;
   default:

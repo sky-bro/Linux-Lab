@@ -7,6 +7,15 @@
 #include <netinet/udp.h>		// for udp header
 #include <netinet/tcp.h>     // for tcp header
 #include <time.h>
+#include <map>
+#include <string>
+#include <iostream>
+
+using namespace std;
+
+char sniffer_tmp_mac[50];
+map<string, int> MACs;
+map<string, int> new_MACs;
 
 int total, tcp, udp; // 用int 在filter port时可以安全得减去过滤去的包
 unsigned int ip, arp,icmp,igmp,other,other_ip;
@@ -27,19 +36,9 @@ struct Filter {
 	int udp; // print udp packet
 	int icmp; // print icmp packet
 	int other; // count in other packet
-	uint16_t port; // only this port
 	int dump; // dump packets
-} filter =  {
-	.arp = 1,
-	.ethernet = 0,
-	.ip = 1,
-	.tcp = 0,
-	.udp = 0,
-	.icmp = 0,
-	.port = 0,
-	.dump = 0,
-	.other = 0
-};
+	uint16_t port; // only this port
+} filter =  {1, 0, 1, 0, 0, 0, 0, 0, 0};
 
 void log_summary() {
 
@@ -59,17 +58,26 @@ void log_summary() {
 	fprintf(summary_file, "\t\t|-Other IP: %d\n", other_ip);
 	fprintf(summary_file, "\t|-Other: %d\n", other);
 
+	// log new MACs
+	fprintf(summary_file, "|-New MACs:\n");
+	for (map<string, int>::iterator it=new_MACs.begin(); it != new_MACs.end(); it++) {
+		fprintf(summary_file, "\t%s\n", it->first.c_str());
+	}
+
 	fprintf(summary_file, "END: %s", ctime(&end_time));
 
 	if (summary_file != stdout) {
 		fclose(summary_file);
 	}
+
+	
+
 }
 
 void buf_dump(unsigned char *data, int Size)
 {
 	if (!filter.dump) return;
-	fprintf(log_file, "Dump\n");
+	fprintf(log_file, "\nDump\n");
     int i, j;
 	for (i = 0; i < Size; i++)
 	{
@@ -115,6 +123,20 @@ void print_ethernet_header(unsigned char* buffer,int buflen)
 	fprintf(log_file,"\t|-Source Address	: %.2X-%.2X-%.2X-%.2X-%.2X-%.2X\n",eth->h_source[0],eth->h_source[1],eth->h_source[2],eth->h_source[3],eth->h_source[4],eth->h_source[5]);
 	fprintf(log_file,"\t|-Destination Address	: %.2X-%.2X-%.2X-%.2X-%.2X-%.2X\n",eth->h_dest[0],eth->h_dest[1],eth->h_dest[2],eth->h_dest[3],eth->h_dest[4],eth->h_dest[5]);
 	fprintf(log_file,"\t|-Protocol		: %.4X\n",eth->h_proto);
+
+
+	sprintf(sniffer_tmp_mac,"%.2X-%.2X-%.2X-%.2X-%.2X-%.2X",eth->h_source[0],eth->h_source[1],eth->h_source[2],eth->h_source[3],eth->h_source[4],eth->h_source[5]);
+	if (MACs.find(sniffer_tmp_mac) == MACs.end()) {
+		MACs.insert(pair<string, int>(sniffer_tmp_mac, 1));
+		new_MACs.insert(pair<string, int>(sniffer_tmp_mac, 1));
+		fprintf(mac_list_file, "%s\n", sniffer_tmp_mac);
+	}
+	sprintf(sniffer_tmp_mac,"%.2X-%.2X-%.2X-%.2X-%.2X-%.2X",eth->h_dest[0],eth->h_dest[1],eth->h_dest[2],eth->h_dest[3],eth->h_dest[4],eth->h_dest[5]);
+	if (MACs.find(sniffer_tmp_mac) == MACs.end()) {
+		MACs.insert(pair<string, int>(sniffer_tmp_mac, 1));
+		new_MACs.insert(pair<string, int>(sniffer_tmp_mac, 1));
+		fprintf(mac_list_file, "%s\n", sniffer_tmp_mac);
+	}
 }
 
 void print_ip_header(unsigned char* buffer,int buflen)
@@ -173,7 +195,7 @@ void print_icmp_packet(unsigned char *buffer, int buflen)
 
 	fprintf(log_file, "\nICMP Header\n");
 	fprintf(log_file, "\t|-Type : %d\n", (unsigned int)(icmph->type));
-	if ((unsigned int)(icmph->type) == 11)
+	if ((unsigned int)(icmph->type) == ICMP_TIME_EXCEEDED)
 		fprintf(log_file, " (TTL Expired)\n");
 	else if ((unsigned int)(icmph->type) == ICMP_ECHOREPLY)
 		fprintf(log_file, " (ICMP Echo Reply)\n");
@@ -202,6 +224,7 @@ void print_tcp_packet(unsigned char* buffer,int buflen)
 	struct tcphdr *tcph = (struct tcphdr*)(buffer + iphdrlen + sizeof(struct ethhdr));
 	
 	if (filter.port != 0 && ntohs(tcph->source) != filter.port && ntohs(tcph->dest) != filter.port) {
+		printf("\n\nAAAAAAAAAAAAAAAAA\n\n");
 		--tcp;
 		return;
 	}
@@ -239,6 +262,7 @@ void print_udp_packet(unsigned char* buffer, int buflen)
 	struct udphdr *udph = (struct udphdr*)(buffer + iphdrlen + sizeof(struct ethhdr));
 	
 	if (filter.port != 0 && ntohs(udph->source) != filter.port && ntohs(udph->dest) != filter.port) {
+		printf("\n\nAAAAAAAAA port %u AAAAAAAA\n\n", filter.port);
 		--udp;
 		return;
 	}
