@@ -6,11 +6,9 @@
 
 /* Program documentation. */
 static char doc[] =
-  "Argp example #4 -- a program with somewhat more complicated\
+  "Sniffer w/ RAW SOCKET -- a program sniffs local network traffic, build upon raw socket...\n\
 options\
-\vThis part of the documentation comes *after* the options;\
- note that the text is automatically filled, but it's possible\
- to force a line-break, e.g.\n<-- here.";
+\vYou Need To Have Root Permission to Use Raw Socket!\n";
 
 /* A description of the arguments we accept. */
 static char args_doc[] = "[PROTOCOLS...]";
