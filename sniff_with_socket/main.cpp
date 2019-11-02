@@ -139,10 +139,10 @@ int main(int argc, char **argv)
 			printf("error in reading recvfrom function\n");
 			return -1;
 		}
+		data_process(buffer,buflen);
 		fflush(log_file);
 		// fflush(summary_file);
 		fflush(mac_list_file);
-		data_process(buffer,buflen);
 	}
 	end_time = time(NULL);
 	log_summary();

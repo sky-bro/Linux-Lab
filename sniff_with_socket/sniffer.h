@@ -167,8 +167,8 @@ void print_ip_header(unsigned char* buffer,int buflen)
 	fprintf(log_file , "\t|-Type Of Service         : %d\n",(unsigned int)iph->tos);
 	fprintf(log_file , "\t|-Total Length            : %d  Bytes\n",ntohs(iph->tot_len));
 	fprintf(log_file , "\t|-Identification          : %d\n",ntohs(iph->id));
-	fprintf(log_file , "\t|-Time To Live	        : %d\n",(unsigned int)iph->ttl);
-	fprintf(log_file , "\t|-Protocol 	            : %d\n",(unsigned int)iph->protocol);
+	fprintf(log_file , "\t|-Time To Live            : %d\n",(unsigned int)iph->ttl);
+	fprintf(log_file , "\t|-Protocol                : %d\n",(unsigned int)iph->protocol);
 	fprintf(log_file , "\t|-Header Checksum         : %d\n",ntohs(iph->check));
 	fprintf(log_file , "\t|-Source IP               : %s\n", inet_ntoa(source.sin_addr));
 	fprintf(log_file , "\t|-Destination IP          : %s\n",inet_ntoa(dest.sin_addr));
