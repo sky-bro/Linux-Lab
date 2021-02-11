@@ -28,7 +28,7 @@
 
 * `argc`和`argv` 就是传递给main函数的两个参数，`argv`就是程序运行时的程序名以及它的参数，是一个字符串数组，`argc`就是这个字符串数组的长度
 * `optstring` 指定需要解析的短参数，比如`"abc:d:e::"`表示有`abcde`这5种参数，而且`ab`不带参数，`c`带参数(后面跟的`:`表示后面必须跟一个参数)，`e`可带可不带参数(后面跟的`::`表示选项参数是可选的，如果带参数必须紧挨着选项，也就是`-exxx`，不能有空格隔开如`-e xxx`，隔开则视为没有带参数)，选项参数由`optarg`指向
-* `longopts` 指向option数组，包含了长选项的信息，下一节详细介绍这个结构体
+* `longopts` 指向option数组，包含了长选项的信息，数组最后一个元素（结构体）必须全部为0，下一节详细介绍这个结构体
 * `longindex` 如果不是null，那么将解析参数时将把它指向的变量设为对应的`longopts`数组的下标
 
 ### option结构体
@@ -43,7 +43,7 @@ struct option {
 ```
 
 * `name` 表示长选项的名字，使用时就是用`--<name>`的形式
-* `has_arg` 用来指示这个选项的参数要求，`no_argument`或者`0`表示不带参数，`required_argument`或者`1`表示必须带参数，`optional_argument`或者`2`表示参数是可选的
+* `has_arg` 用来指示这个选项的参数要求，`no_argument`或者`0`表示不带参数，`required_argument`或者`1`表示必须带参数，`optional_argument`或者`2`表示参数是可选的(可选的参数要带参数的话必须是`--opt=param`形式，不能用空格隔开，要用等于)
 * `flag` 通常设为0，若不为0,那么解析参数时将会把`*flag`设置为val，然后函数返回0
 * `val` 解析到参数时函数返回的值，或者设置`*flag`的值，通常把它设为对应的短参数字符
 
@@ -140,10 +140,61 @@ got 58 (:), optopt: 99 (c)
 ### 示例代码getopt_long-test.c
 
 ```c
+// getopt_long-test.c
+// gcc -g -o getopt_long-test getopt_long-test.c
+// ./getopt_long-test -e s --name sky --delete 123 -d123 --delete=123 --new --add -fe
+#include <getopt.h>
+#include <stdio.h>
+#include <unistd.h>
 
+int main(int argc, char *const argv[]) {
+  char c;
+  //   opterr = 0;
+  int ret, longind;
+  struct option long_options[] = {{"add", no_argument, 0, 'a'},
+                                  {"new", no_argument, 0, 'n'},
+                                  {"name", required_argument, 0, 256},
+                                  {"create", required_argument, 0, 'c'},
+                                  {"delete", optional_argument, 0, 'd'},
+                                  {0, 0, 0, 0}};
+  while ((ret = getopt_long(argc, argv, "anc:e:d::", long_options, &longind)) != -1) {
+//   while ((ret = getopt_long(argc, argv, ":anc:e:d::", long_options, &longind)) != -1) {
+    switch (ret) {
+      case 'a':
+        printf("got 'a', longind is: %d\n", longind);
+        break;
+      case 'n':
+        printf("got 'n', longind is: %d\n", longind);
+        break;
+      case 256:
+        printf("%s %s\n", long_options[longind].name, optarg);
+        break;
+      case 'c':
+        printf("got 'c', longind is: %d\n", longind);
+        break;
+      case 'd':
+        printf("got 'd', longind is: %d\n", longind);
+        if (optarg) {
+          printf("optional argument is: %s\n", optarg);
+        } else {
+          printf("no argument\n");
+        }
+        break;
+      case 'e':
+        printf("got 'e' -- %s\n", optarg);
+        break;
+      default:
+        printf("got %d (%c), optopt: %d (%c)\n", c, c, optopt, optopt);
+        break;
+    }
+  }
+  return 0;
+}
 ```
 
 ### 运行情况
+
+> TODO, 有些问题，我试验时，遇到错误参数不会返回`:`或者`?`，总是返回`0`，这和文档不一致，还没搞清楚原因是什么
 
 ## more
 
