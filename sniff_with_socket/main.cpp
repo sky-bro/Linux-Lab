@@ -13,6 +13,7 @@
 #include <map>
 #include <string>
 #include <iostream>
+#include <sys/stat.h>
 
 using namespace std;
 
@@ -34,7 +35,7 @@ void sighandler(int signum) {
 int main(int argc, char **argv)
 {
     signal(SIGINT, sighandler);
-
+	umask(0);
     struct sockaddr saddr;
 	int saddr_len, buflen;
 
